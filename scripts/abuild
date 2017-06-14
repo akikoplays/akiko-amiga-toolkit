@@ -1,0 +1,87 @@
+#!/usr/bin/env python
+
+import os
+import os.path
+import sys
+import subprocess
+import argparse
+
+
+# Predefined compiler flags
+vc="vc"
+cflags="-v -cpp-comments -c99 -cpu=68020 " # assets/P61.shitstorm-rsv.c
+linker="-lamiga -lauto -lmieee "
+output="demo"
+
+
+# def collectFilesOfType(dir, extension):
+#     print "-- collecting files with extension: %s" % (extension)
+#     list = []
+#     for root, dirs, files in os.walk(dir):
+#         for file in files:
+#             if file.endswith(extension):
+#                 #print(os.path.join(root, file))
+#                 list.append(file)
+#     return list
+
+def collectFilesOfType(root, extension):
+    print "-- collecting files with extension: %s" % (extension)
+    list = []
+    for item in os.listdir(root):
+        if os.path.isfile(os.path.join(root, item)):
+            if item.endswith(extension):
+                list.append(item)
+                print ".... %s" % (item)
+    return list
+
+
+parser = argparse.ArgumentParser(description='Akikos automated batch builder for Amiga coders. Based on vcc and vasm.')
+parser.add_argument('-cf', '--cflags', type=str, default=cflags, help='c compiler flags to include during compilation')
+parser.add_argument('-lf', '--lflags', type=str, default=linker, help='linker flags to include during compilation')
+parser.add_argument('-cd', '--chdir', type=str, default="./", help='batch build in directory, default is ./ ')
+args = parser.parse_args()
+print "-- setting cflags to %s" % (args.cflags)
+cflags = args.cflags
+print "-- setting linker flags to %s" % (args.lflags)
+linker = args.lflags
+
+# set current build directory
+srcdir = args.chdir
+print "-- setting working in directory: ", srcdir
+
+# change current working directory to srcdir
+os.chdir(srcdir)
+
+# collect all asm and c files
+asmfiles = collectFilesOfType("./", ".s")
+cfiles = collectFilesOfType("./", ".c")
+if len(cfiles) == 0:
+    print "Nothing to build. Ejecting."
+    exit(0)
+
+# process asm files
+objs = []
+for f in asmfiles:
+    #vasm - devpac - Fvobj $f - o "$filename.o"
+    base = os.path.splitext(f)[0]
+    cmdstr = "vasm -devpac -Fvobj %s -o %s.o" % (f, base)
+    objs.append("%s.o" % (base))
+    print "assembling: ", cmdstr
+    proc = subprocess.Popen(cmdstr, shell=True, stdout=subprocess.PIPE)
+    for line in proc.stdout:
+        print line
+    proc.wait()
+    if proc.returncode != 0:
+        print "Error: assembly failed, ret code = ", proc.returncode
+        exit(1)
+
+# process c fies
+cfilestr = " ".join(cfiles)
+objsstr = " ".join(objs)
+cmdstr = "%s %s %s %s %s -o %s" % (vc, cflags, objsstr, cfilestr, linker, output)
+print cmdstr
+
+proc = subprocess.Popen(cmdstr, shell=True, stdout=subprocess.PIPE)
+for line in proc.stdout:
+    print line
+proc.wait()
