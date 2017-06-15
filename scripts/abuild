@@ -9,7 +9,7 @@ import argparse
 
 # Predefined compiler flags
 vc="vc"
-cflags="-v -cpp-comments -c99 -cpu=68020 " # assets/P61.shitstorm-rsv.c
+cflags="-v -cpp-comments -c99 -cpu=68020" # assets/P61.shitstorm-rsv.c"
 linker="-lamiga -lauto -lmieee "
 output="demo"
 
@@ -34,16 +34,25 @@ def collectFilesOfType(root, extension):
                 print ".... %s" % (item)
     return list
 
+# execute shell command, print stdout and return proc object for e.g. result checking
+# note: execution is done blockingly (proc.wait())
+def runShellCmd(cmdstr):
+    proc = subprocess.Popen(cmdstr, shell=True, stdout=subprocess.PIPE)
+    for line in proc.stdout:
+        print line
+    proc.wait()
+    return proc
+
 
 parser = argparse.ArgumentParser(description='Akikos automated batch builder for Amiga coders. Based on vcc and vasm.')
-parser.add_argument('-cf', '--cflags', type=str, default=cflags, help='c compiler flags to include during compilation')
-parser.add_argument('-lf', '--lflags', type=str, default=linker, help='linker flags to include during compilation')
+parser.add_argument('-cf', '--cflags', type=str, default="", help='c compiler flags to include during compilation')
+parser.add_argument('-lf', '--lflags', type=str, default="", help='linker flags to include during compilation')
 parser.add_argument('-cd', '--chdir', type=str, default="./", help='batch build in directory, default is ./ ')
 args = parser.parse_args()
 print "-- setting cflags to %s" % (args.cflags)
-cflags = args.cflags
+cflags = cflags + args.cflags
 print "-- setting linker flags to %s" % (args.lflags)
-linker = args.lflags
+linker = linker + args.lflags
 
 # set current build directory
 srcdir = args.chdir
@@ -67,10 +76,7 @@ for f in asmfiles:
     cmdstr = "vasm -devpac -Fvobj %s -o %s.o" % (f, base)
     objs.append("%s.o" % (base))
     print "assembling: ", cmdstr
-    proc = subprocess.Popen(cmdstr, shell=True, stdout=subprocess.PIPE)
-    for line in proc.stdout:
-        print line
-    proc.wait()
+    proc = runShellCmd(cmdstr)
     if proc.returncode != 0:
         print "Error: assembly failed, ret code = ", proc.returncode
         exit(1)
@@ -81,13 +87,19 @@ objsstr = " ".join(objs)
 cmdstr = "%s %s %s %s %s -o %s" % (vc, cflags, objsstr, cfilestr, linker, output)
 print cmdstr
 
-proc = subprocess.Popen(cmdstr, shell=True, stdout=subprocess.PIPE)
-for line in proc.stdout:
-    print line
-proc.wait()
+proc = runShellCmd(cmdstr)
+if proc.returncode != 0:
+    print "Error: compiler failed, ret code = ", proc.returncode
+    exit(1)
 
 # dump command line to lastcmd
 print sys.argv
 fp = open("lastcmd", "w")
 fp.write("abuild %s" % (" ".join(sys.argv)))
 fp.close()
+
+# post build step script - execute if exists
+if os.path.isfile("post-abuild.sh"):
+    print "-- found post-abuild.sh script, executing it ..."
+    runShellCmd("./post-abuild.sh")
+
