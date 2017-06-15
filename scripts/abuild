@@ -85,3 +85,9 @@ proc = subprocess.Popen(cmdstr, shell=True, stdout=subprocess.PIPE)
 for line in proc.stdout:
     print line
 proc.wait()
+
+# dump command line to lastcmd
+print sys.argv
+fp = open("lastcmd", "w")
+fp.write("abuild %s" % (" ".join(sys.argv)))
+fp.close()
