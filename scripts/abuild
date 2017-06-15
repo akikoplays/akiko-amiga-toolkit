@@ -50,9 +50,9 @@ parser.add_argument('-lf', '--lflags', type=str, default="", help='linker flags 
 parser.add_argument('-cd', '--chdir', type=str, default="./", help='batch build in directory, default is ./ ')
 args = parser.parse_args()
 print "-- setting cflags to %s" % (args.cflags)
-cflags = cflags + args.cflags
+cflags = cflags + " " + args.cflags
 print "-- setting linker flags to %s" % (args.lflags)
-linker = linker + args.lflags
+linker = linker + " " + args.lflags
 
 # set current build directory
 srcdir = args.chdir
