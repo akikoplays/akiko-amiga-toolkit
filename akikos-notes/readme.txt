@@ -43,6 +43,81 @@ for editing i use Sublime 3 editor on mac. you can key bind Cmd+b to invoke ./bu
 
 
 
+development environment - advanced compilation method (using CMake)
+
+at some point i wrote first shell then python scripts that can batch assemble and compile all the sources in the working directory, and create the output executable, using first vasm to process all *.s -> *.o files, then invoking vc with command line arguments and collected *.o and *.c files. The script is not complicated and it does the job fairly good. but i wanted to have some shared sources in a different folder, e.g. imagine this structure where intro1 is you current project:
+
+|-- agtlib
+|   |-- aux3d.c
+|   |-- aux3d.h
+|   |-- c2p1x1_4_c5_bm.s
+|   |-- c2p1x1_8_c5_bm.s
+|   |-- c2p2x1_8_c5_bm.s
+|   |-- c2p2x2_8_c5_bm.s
+|   |-- c2p_020.s
+|   |-- common.c
+|   |-- common.h
+|   |-- copper.c
+|   |-- copper.h
+|   `-- stdafx.h
+|-- intro1
+|   |-- CMakeLists.txt
+|   |-- P6112
+|   |   |-- P6112-Play.i
+|   |   |-- P6112.readme
+|   |   `-- P61Con
+|   |-- assets
+|   |   `-- P61.shitstorm-rsv.c
+|   |-- build
+|   |-- kill.s
+|   |-- main.c
+|   `-- stdafx.h
+
+
+now, imagine you want to build intro1 project, but you also want to provide .s and .c files from ../agtlib to it. this would complicate your script quite a bit, introducing new command line directives, at least. so i decided to switch to cmake, which in a couple of lines takes care of recursion and is easily capable of executing shell commands, post and pre build steps etc. The simplified cmake script looks like this:
+
+################################################################
+project(intro1)
+
+SET(CMAKE_VERBOSE_MAKEFILE on)
+
+add_custom_target(
+	Assembler
+	COMMAND batchassembler -cd ${CMAKE_SOURCE_DIR}
+	COMMAND batchassembler -cd ${CMAKE_SOURCE_DIR}/../agtlib
+)
+
+# add_custom_target(clean-all
+#   COMMAND ${CMAKE_BUILD_TOOL} clean
+#   COMMAND ${CMAKE_COMMAND} -P clean-all.cmake
+# )
+
+SET(EXECUTABLE_OUTPUT_PATH ../)
+SET(CMAKE_C_COMPILER vc)
+SET(CMAKE_C_FLAGS "-cpp-comments -c99 -cpu=68020")
+SET(CMAKE_EXE_LINKER_FLAGS "-lamiga -lauto -lmieee")
+INCLUDE_DIRECTORIES(../agtlib)
+FILE(GLOB SRC_FILES ${CMAKE_SOURCE_DIR}/*.c ${CMAKE_SOURCE_DIR}/assets/*.c ${CMAKE_SOURCE_DIR}/../agtlib/*.c ${CMAKE_SOURCE_DIR}/*.o ${CMAKE_SOURCE_DIR}/../agtlib/*.o)
+
+ADD_EXECUTABLE(demo main.c ${SRC_FILES})
+ADD_DEPENDENCIES(demo Assembler)
+################################################################
+
+To use it, best practice is:
+# make sure your-project/../agtlib exists
+$ cd your-project
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+
+to clean up the local cache files simply while in ./build folder invoke:
+$ rm -frv *
+
+this will still leave all the .o files in the your-project and ../agtlib/ folders, you may want to take care of them manually.
+
+
+
 invoking asm subroutines from c
 
 in asm source file you need to export the subrouting up front using this forward declaration:
@@ -99,6 +174,29 @@ make sure it's __chip assigned! then import asm subroutine:
 
 why not having it incbined in asm source? well for some reason vc linker ignored the data_c directive in asm file. don't know why. it was always corrupted and i couldn't work around it other than putting it in __chip in c and passing it to asm subroutine. in general i started doing this with all files, images, palettes etc, including them or disk i/o reading them in c, and passing them as arguments to asm subroutines.
 
+
+- converting mod to p61 file - 
+
+the folder P6112, which is a standard part of agtlib collection, comes with the amiga executable P61Con that can be used withing Workbench to convert mod file to p61.
+
+
+- my approach to loading images -
+
+there are generally 2 ways to load images dynamically.
+a) have them converted to binary and linked together with the executable (or a resource file).
+b) have them lying on disk and then dynamically loading them using Disk I/O
+
+i am opting for b) because it allows me to easily modify or replace images and just rerun the demo, without having to worry about rebuilding the whole executable, of course if possible to avoid that.
+
+when loading images you can go with several formats on amiga, some of them make sense others don't. for example you don't want to load jpeg, gif or compressed png, it simply takes too much time and memory on stock 020 cpu, and below that even not to mention.
+so, we need some kind of uncompressed format that is fast enough to load and prepare for either bitplane or chunky use. in my early assembler days i used to use iff master and manually convert images from iff to raw and then export copper palettes separately. but today when i work which much more complex environment i decided to use png format, and during the prebuild step convert it to 256 colors raw 888 rgb file. this file is then loaded realtime and used in the demo. 
+
+i am using imagemagick (linux/osx) to convert png images to rgb (raw 888 chunky) files. these i load using a C function that finds all unique colors, and puts them in a color buffer. the colors are stored as 32bit with the following format: 
+unsigned int rgb = b | g << 8 | r << 16;
+so the highest byte is unused (reserved for alpha? or mask? we will see in future).
+
+imagemagick command to convert a png to 8bit 256 colors raw rgb is:
+convert $1 -depth 8 -colors 255 $2 # note that color 0 is reserved for background color, i don't know if this is in use at all but that's how imagemagick png works. this can also be forced otherwise, but i don't really need to tweak that.
 
 - how i started with 3d line vectors, again - 
 

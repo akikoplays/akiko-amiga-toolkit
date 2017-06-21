@@ -1,4 +1,4 @@
-
+#!/bin/bash
 # based on http://stackoverflow.com/questions/965053/extract-filename-and-extension-in-bash
 
 filename=$(basename "$1")
@@ -12,7 +12,7 @@ echo path: $path
 
 output="${path}""${filename}"."rgb"
 echo Converting "$1" to "$output"
-convert $1 -depth 8 "$output"
+convert $1 -depth 8 -colors 255 "$output"
 
 echo converting rgb to .h
 header="${path}""${filename}"."h"
