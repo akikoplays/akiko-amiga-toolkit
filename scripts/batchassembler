@@ -49,7 +49,7 @@ objs = []
 for f in asmfiles:
     #vasm - devpac - Fvobj $f - o "$filename.o"
     base = os.path.splitext(f)[0]
-    cmdstr = "vasm -devpac -Fvobj %s -o %s.o" % (f, base)
+    cmdstr = "vasm -devpac -m68020 -Fvobj %s -o %s.o" % (f, base)
     objs.append("%s.o" % (base))
     print "assembling: ", cmdstr
     proc = runShellCmd(cmdstr)
