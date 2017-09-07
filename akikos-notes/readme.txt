@@ -82,25 +82,40 @@ project(intro1)
 SET(CMAKE_VERBOSE_MAKEFILE on)
 
 add_custom_target(
-	Assembler
+	assembler
+)
+
+add_custom_command(
+	TARGET assembler
+	PRE_BUILD
+	COMMAND echo [***] Running Assembler ..........
 	COMMAND batchassembler -cd ${CMAKE_SOURCE_DIR}
 	COMMAND batchassembler -cd ${CMAKE_SOURCE_DIR}/../agtlib
 )
 
-# add_custom_target(clean-all
-#   COMMAND ${CMAKE_BUILD_TOOL} clean
-#   COMMAND ${CMAKE_COMMAND} -P clean-all.cmake
-# )
+add_custom_target(
+	cleaner
+)
+
+add_custom_command(
+	TARGET cleaner
+	COMMAND echo [***] Running Cleanup ..........
+	COMMAND rm -f ${CMAKE_BINARY_DIR}/demo
+	COMMAND rm -f ${CMAKE_SOURCE_DIR}/*.o
+	COMMAND rm -f ${CMAKE_BINARY_DIR}/*.o
+	COMMAND rm -f ${CMAKE_SOURCE_DIR}/../agtlib/*.o
+)
 
 SET(EXECUTABLE_OUTPUT_PATH ../)
 SET(CMAKE_C_COMPILER vc)
-SET(CMAKE_C_FLAGS "-cpp-comments -c99 -cpu=68020")
+SET(CMAKE_C_FLAGS "-v -cpp-comments -c99 -cpu=68020")
 SET(CMAKE_EXE_LINKER_FLAGS "-lamiga -lauto -lmieee")
 INCLUDE_DIRECTORIES(../agtlib)
-FILE(GLOB SRC_FILES ${CMAKE_SOURCE_DIR}/*.c ${CMAKE_SOURCE_DIR}/assets/*.c ${CMAKE_SOURCE_DIR}/../agtlib/*.c ${CMAKE_SOURCE_DIR}/*.o ${CMAKE_SOURCE_DIR}/../agtlib/*.o)
+FILE(GLOB SRC_FILES ${CMAKE_SOURCE_DIR}/*.c ${CMAKE_SOURCE_DIR}/assets/*.c ${CMAKE_SOURCE_DIR}/../agtlib/*.c ${CMAKE_SOURCE_DIR}/*.o ${CMAKE_SOURCE_DIR}/../agtlib/*.o *o *c)
 
 ADD_EXECUTABLE(demo main.c ${SRC_FILES})
-ADD_DEPENDENCIES(demo Assembler)
+# ADD_DEPENDENCIES(demo cleaner)
+ADD_DEPENDENCIES(demo assembler)
 ################################################################
 
 To use it, best practice is:
@@ -118,7 +133,7 @@ this will still leave all the .o files in the your-project and ../agtlib/ folder
 
 
 
-invoking asm subroutines from c
+- invoking asm subroutines from c -
 
 in asm source file you need to export the subrouting up front using this forward declaration:
 
@@ -141,6 +156,16 @@ void c2p2x2_8_c5_bm(	__reg("d0") UWORD chunkyx,
 						__reg("a0") UBYTE *chunkyscreen,
 						__reg("a1") UBYTE *BitMap
 	);
+
+if an assembly subroutine has to return data to the C invoker function then we need to declare this up front like this, e.g.:
+__reg("d0") ULONG c824(__reg("d0") unsigned long rgb888);
+
+WARNING:
+regarding data types, i started using the cross platform 'safe' types such as int32_t or uint32_t etc, but after some time i switched back to Amiga's native ULONG, UBYTE and alike, because vc didn't really work if you declared e.g. :
+	__reg("d0") ULONG c824(__reg("d0") uint32_t rgb888); // WRONG RESULTS
+instead of:
+	__reg("d0") ULONG c824(__reg("d0") unsigned long rgb888); // OK
+
 
 
 
@@ -197,6 +222,20 @@ so the highest byte is unused (reserved for alpha? or mask? we will see in futur
 
 imagemagick command to convert a png to 8bit 256 colors raw rgb is:
 convert $1 -depth 8 -colors 255 $2 # note that color 0 is reserved for background color, i don't know if this is in use at all but that's how imagemagick png works. this can also be forced otherwise, but i don't really need to tweak that.
+
+
+- notes on memory management -
+
+while writing various routines (in C) i at first for cross platform compatibility and inertia reasons was using stdlib's malloc, memcpy, memset, free functions. this worked fine for some time, but then things started happening that were very weird, for example i was able to load one rgb image, but as soon as i loaded the second image the chunky data was messed up, colors seemed randomly broken. i don't want to go too much in detail here, honestly i also forgot the exact code snippets that were in play back then. the important thing is - i rewrote all mem handling subroutines to use amiga exec's functions such as:
+
+* AllocVec and FreeVec
+* CopyMem, CopyMemQuick
+
+even for struct allocation i switched to AllocVec, e.g. 
+	ChunkyImage *img = (ChunkyImage *)AllocVec(sizeof(ChunkyImage), MEMF_CLEAR);
+	// and later
+	FreeVec(img);
+
 
 - how i started with 3d line vectors, again - 
 

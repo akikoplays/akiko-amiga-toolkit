@@ -9,10 +9,10 @@ RUN apt-get update && apt-get -y upgrade
 RUN apt-get install -y sudo && rm -rf /var/lib/apt/lists/*
 # Must do reupdate after previous sudo install
 RUN apt-get update
-RUN apt-get install -y gawk wget git-core diffstat unzip texinfo  build-essential chrpath libsdl1.2-dev xterm curl python 
+RUN apt-get install -y gawk wget git-core diffstat unzip texinfo  build-essential chrpath libsdl1.2-dev xterm curl python python-setuptools
 RUN apt-get install -y mc htop nano vim
 # amiga cross compiler toolchain dependencies
-RUN apt-get install -y gperf bison libncurses-dev python-dev gcc-multilib
+RUN apt-get install -y gperf bison gettext libncurses-dev python-dev gcc-multilib
 
 
 # -----------------------------------------------
