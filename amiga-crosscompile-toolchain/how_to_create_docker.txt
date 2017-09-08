@@ -1,3 +1,10 @@
 docker build -t amiga .
 docker run -itd --name amiga amiga
 docker exec -it amiga /bin/bash
+
+# create symbolic link that points to the common amiga hdd repository (usually Dropbox folder that is shared across computers, or whatever you are using)
+ln -s ~/Dropbox/exchange/akikos_amigadev/ ./exchange
+
+# rund with volume mounted
+docker run -v ~/Dropbox/exchange/akikos_amigadev/:/home/akiko/code -itd --name amiga amiga
+docker exec -it amiga /bin/bash
